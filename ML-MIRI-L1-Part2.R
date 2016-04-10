@@ -1,6 +1,7 @@
 ####################################################################
 # Machine Learning - MIRI Master
-# Llu√É≠s A. Belanche
+# Author:
+# think_2ice <- Manel Alba
 
 # LAB 1: Data pre-processing (Part2)
 # version of February 2015
