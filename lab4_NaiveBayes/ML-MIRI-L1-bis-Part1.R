@@ -1,6 +1,7 @@
 ####################################################################
 # Machine Learning - MIRI Master
-
+# Author:
+# # Lluís A. Belanche
 # LAB 4: Text pre-processing (Part1)
 # version of March 2016
 ####################################################################
