@@ -1,0 +1,2 @@
+In this lab session the Naive Bayes method is used to classify (supervised learning) data into different classes. Two datasets are used: identify the topic of a new (this is provided in the file reuters.txt.gz) and classify emails into spam or non-spam (this dataset can be accessed from one library of R).  
+
