@@ -37,7 +37,6 @@ plot(yeast)
 # Plots of the histogram for each continuous variable
 par(mfrow = c(3,3))
 for (i in c(1:4,6:8)) {
-  
   hist(yeast[,i], main = names(yeast)[i])
 }
 # Barplot of the erl variable
@@ -71,7 +70,7 @@ CV.folds <- generateCVRuns(yeast.train$class, ntimes=1, nfold=k, stratified=TRUE
 # 5. Classification methods
 
 # baseline: the error that we get predicting always the most probable class
-baseline <- 100*(1 - max(table(yeast$class))/nrow(yeast))
+(baseline <- 100*(1 - max(table(yeast$class))/nrow(yeast)))
 # let's see if this can be improved using: 
 
 # 5.1 Naive Bayes
