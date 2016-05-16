@@ -121,6 +121,62 @@ cv.results
 # Average of the validation error
 (VA.error <- mean(cv.results[,"VA error"]))
 
+Model.CV <- function (k, method)
+{
+  CV.folds <- generateCVRuns(yeast.train$class, ntimes=1, nfold=k, stratified=TRUE)
+  
+  cv.results <- matrix (rep(0,4*k),nrow=k)
+  colnames (cv.results) <- c("k","fold","TR error","VA error")
+  
+  cv.results[,"TR error"] <- 0
+  cv.results[,"VA error"] <- 0
+  cv.results[,"k"] <- k
+  for (j in 1:k) {
+    # get VA data
+    va <- unlist(CV.folds[[1]][[j]])
+    tr <- yeast.train[-va,]
+    # train on TR data
+    if (method == "NaiveBayes") {
+      model <- naiveBayes(tr$class ~ . , data = tr, laplace=3)
+    }
+    else if (method == "QDA"){
+      model <- lda(tr$class ~ . , data = tr, CV=FALSE)
+    }
+    else if (method == "LDA"){
+      model <- lda(tr$class ~ . , data = tr, CV=FALSE)
+    }
+    else {
+      stop("Unknown method. The only valid methods ara NaiveBayes, LDA and QDA")
+    }
+  
+    # predict TR data
+    if (method == "NaiveBayes") {
+      pred.tr <- predict(model,newdata=tr)
+    }
+    else {
+      pred.tr <- predict(model)$class
+    }
+    
+    tab <- table(tr$class, pred.tr)
+    cv.results[j,"TR error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
+  
+    # predict VA data
+    if (method == "NaiveBayes") {
+      pred.va <- predict(model,newdata=yeast.train[va,])
+    }
+    else {
+      pred.va <- predict(model,newdata=yeast.train[va,])$class
+    }
+    
+    tab <- table(yeast.train[va,]$class, pred.va)
+    cv.results[j,"VA error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
+    cv.results[j,"fold"] <- j
+  }
+  mean(cv.results[,"VA error"])
+}
+Model.CV(10,"NaiveBayes")
+Model.CV(10,"LDA")
+Model.CV(10,"QDA")
 # 6. Results: Which classification algorithm is the best? 
 
 
