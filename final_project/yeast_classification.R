@@ -177,6 +177,7 @@ Model.CV <- function (k, method)
 Model.CV(10,"NaiveBayes")
 Model.CV(10,"LDA")
 Model.CV(10,"QDA")
+
 # 6. Results: Which classification algorithm is the best? 
 
 
