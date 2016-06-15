@@ -1,0 +1,6 @@
+First slide: Title, names, and small description of the project
+Second slide: Cloud of words with:
+Regularization Complexity NeuralNetworks PCA KNN CrossValidation RandomForest ConfusionMatrix Preprocessing Underfitting Overfitting Challenge Statistics MachineLearning Histogram Visualization Classification Classification Sacrifices FeatureExtraction FeatureSelection Decision Knowledge LDA QDA LDA QDA KNN RandomForest Classification
+Could be generated from: 
+https://www.jasondavies.com/wordcloud/
+Third slide: conclusion, smartest moves, best results, etc.

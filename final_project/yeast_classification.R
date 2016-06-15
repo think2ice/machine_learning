@@ -178,8 +178,27 @@ Model.CV(10,"NaiveBayes")
 Model.CV(10,"LDA")
 Model.CV(10,"QDA")
 
-# 6. Results: Which classification algorithm is the best? 
+# KNN
+# Pca -> NN
+# First we execute PCA to standarized and uncorrelated
+# the data
+library("FactoMineR")
+par(mfrow = c(1,2))
+pca_yeast <- PCA(yeast, quali.sup = c(5,9))
+# Plot of the individuals (using class as a color) 
+par(mfrow = c(1,1))
+plot(pca_yeast$ind$coord, col = yeast$class)
+# Try to guess how many PC are the optimal for this problem
+# Plot of the eigenvalues
+plot(pca_yeast$eig$eigenvalue, type = "b", main = "Eigenvalues")
+pca_yeast$eig
+# Following the Kaiser rule (keeping 80% of the variance) we decided to 
+# keep 5 eigenvalues (which is the default number in PCA))
+# Now we can train a neural network
 
+# RAndom forest
+
+# 6. Results: Which classification algorithm is the best? 
 
 
 # 7. Train the X algorithm with all the training data and test its behavior
