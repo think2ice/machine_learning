@@ -61,6 +61,10 @@ N <- dim(yeast)[1]
 learn <- sample(1:N, round(2/3*N))
 yeast.train <- yeast[learn,]
 yeast.test <- yeast[-learn,]
+dim(yeast.test)
+yeast[row.names(yeast[-learn,]),]
+match(row.names(yeast),row.names(yeast.test))
+
 library(TunePareto)
 # Prepare a crossvalidation 10x10 method to get the best model with
 # several classifiers
@@ -72,23 +76,12 @@ CV.folds <- generateCVRuns(yeast.train$class, ntimes=1, nfold=k, stratified=TRUE
 # baseline: the error that we get predicting always the most probable class
 (baseline <- 100*(1 - max(table(yeast$class))/nrow(yeast)))
 # let's see if this can be improved using: 
-
-# 5.1 Naive Bayes
-
-library(e1071)
-# Without cross-validation
-yeast.nb <- naiveBayes (yeast.train$class ~ ., data=yeast.train, laplace=3)
-# predict the left-out data
-pred <- predict(yeast.nb,newdata=yeast.test)
-(tt <- table(Truth=yeast.test$class, Predicted=pred))
-(error <- 100*(1-sum(diag(tt))/sum(tt)))
-# Reduction of the error
-100*(baseline-error)/baseline
-# Real error for each class
-for (i in 1:8) {
-  cat(levels(yeast.test$class)[i])
-  print(1- tt[i,i]/sum(tt[i,]))
-}
+# 1. Naive Bayes
+# 2. LDA
+# 3. QDA
+# 4. KNN
+# 5. PCA + Neural Networks
+# 6. Random Forest
 
 # With cross-validation
 # prepare the structure to store the partial results
@@ -120,17 +113,22 @@ for (j in 1:k) {
 cv.results
 # Average of the validation error
 (VA.error <- mean(cv.results[,"VA error"]))
-
-Model.CV <- function (k, method)
+# library necessary for Naive Bayes
+library(e1071)
+# library necessary for Random Forest
+library(randomForest)
+# library necessary for LDA and QDA
+library(MASS)
+k <- 10
+CV.folds <- generateCVRuns(yeast.train$class, ntimes=1, nfold=k, stratified=TRUE)
+Model.CV <- function (method)
 {
-  CV.folds <- generateCVRuns(yeast.train$class, ntimes=1, nfold=k, stratified=TRUE)
-  
   cv.results <- matrix (rep(0,4*k),nrow=k)
   colnames (cv.results) <- c("k","fold","TR error","VA error")
-  
   cv.results[,"TR error"] <- 0
   cv.results[,"VA error"] <- 0
   cv.results[,"k"] <- k
+  resp.var <- which(colnames(yeast.train)=='class')
   for (j in 1:k) {
     # get VA data
     va <- unlist(CV.folds[[1]][[j]])
@@ -138,65 +136,85 @@ Model.CV <- function (k, method)
     # train on TR data
     if (method == "NaiveBayes") {
       model <- naiveBayes(tr$class ~ . , data = tr, laplace=3)
+      # predict TR data
+      pred.tr <- predict(model,newdata=tr)
+      tab <- table(tr$class, pred.tr)
+      cv.results[j,"TR error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
+      pred.va <- predict(model,newdata=yeast.train[va,])
+      tab <- table(yeast.train[va,]$class, pred.va)
+      cv.results[j,"VA error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
+      cv.results[j,"fold"] <- j
     }
     else if (method == "QDA"){
       model <- lda(tr$class ~ . , data = tr, CV=FALSE)
+      # predict TR data
+      pred.tr <- predict(model)$class
+      tab <- table(tr$class, pred.tr)
+      cv.results[j,"TR error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
+      pred.va <- predict(model,newdata=yeast.train[va,])$class
+      tab <- table(yeast.train[va,]$class, pred.va)
+      cv.results[j,"VA error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
+      cv.results[j,"fold"] <- j
     }
     else if (method == "LDA"){
       model <- lda(tr$class ~ . , data = tr, CV=FALSE)
-    }
-    else {
-      stop("Unknown method. The only valid methods ara NaiveBayes, LDA and QDA")
-    }
-  
-    # predict TR data
-    if (method == "NaiveBayes") {
-      pred.tr <- predict(model,newdata=tr)
-    }
-    else {
+      # predict TR data
       pred.tr <- predict(model)$class
+      tab <- table(tr$class, pred.tr)
+      cv.results[j,"TR error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
+      pred.va <- predict(model,newdata=yeast.train[va,])$class
+      tab <- table(yeast.train[va,]$class, pred.va)
+      cv.results[j,"VA error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
+      cv.results[j,"fold"] <- j
     }
-    
-    tab <- table(tr$class, pred.tr)
-    cv.results[j,"TR error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
-  
-    # predict VA data
-    if (method == "NaiveBayes") {
-      pred.va <- predict(model,newdata=yeast.train[va,])
+    else if (method == "RandomForest"){
+      rf <- randomForest(formula = class ~., data = tr, xtest = yeast.train[va,-resp.var],
+                         ytest = yeast.train[va,resp.var])
+      cv.results[j,"TR error"] <- 1 - sum(diag(rf$confusion[,-11]) / sum(rf$confusion[,-11]))
+      cv.results[j,"VA error"] <- 1 - sum(diag(rf$test$confusion[,-11]) / sum(rf$test$confusion[,-11]))
+      cv.results[j,"fold"] <- j
     }
     else {
-      pred.va <- predict(model,newdata=yeast.train[va,])$class
+      stop("Unknown method. The only valid methods ara NaiveBayes, LDA, QDA and RandomForest")
     }
-    
-    tab <- table(yeast.train[va,]$class, pred.va)
-    cv.results[j,"VA error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
-    cv.results[j,"fold"] <- j
   }
   mean(cv.results[,"VA error"])
 }
-Model.CV(10,"NaiveBayes")
-Model.CV(10,"LDA")
-Model.CV(10,"QDA")
+# Test the behavior for Naive Bayes
+Model.CV("NaiveBayes")
+# Test the behavior for LDA
+Model.CV("LDA")
+# Test the behavior for QDA
+Model.CV("QDA")
+# Test the behavior for KNN
+Model.CV("KNN")
+# Test the behavior for Random Forest
+Model.CV("RandomForest")
 
-# KNN
-# Pca -> NN
-# First we execute PCA to standarized and uncorrelated
-# the data
+# Trying to solve our problem with PCA and Neural Networks
+# First we execute PCA to standarized and uncorrelated the data
 library("FactoMineR")
 par(mfrow = c(1,2))
-pca_yeast <- PCA(yeast, quali.sup = c(5,9))
+# find the index of the test individuals
+test <- which(!is.na(match(row.names(yeast),row.names(yeast.test))))
+# test <- as.vector(test)
+pca.yeast <- PCA(yeast, quali.sup = c(5,9), ind.sup = test)
+
 # Plot of the individuals (using class as a color) 
 par(mfrow = c(1,1))
 plot(pca_yeast$ind$coord, col = yeast$class)
 # Try to guess how many PC are the optimal for this problem
 # Plot of the eigenvalues
-plot(pca_yeast$eig$eigenvalue, type = "b", main = "Eigenvalues")
-pca_yeast$eig
-# Following the Kaiser rule (keeping 80% of the variance) we decided to 
+plot(pca.yeast$eig$eigenvalue, type = "b", main = "Eigenvalues")
+pca.yeast$eig
+# Following the Kaiser rule (keeping at least 80% of the variance) we decided to 
 # keep 5 eigenvalues (which is the default number in PCA))
 # Now we can train a neural network
+pca.yeast.train <- pca.yeast$ind$coord
+library(nnet)
+summary(yeast)
 
-# RAndom forest
+
 
 # 6. Results: Which classification algorithm is the best? 
 
@@ -204,6 +222,26 @@ pca_yeast$eig
 # 7. Train the X algorithm with all the training data and test its behavior
 # for predicting the test data
 
+# Naive Bayes
+
+yeast.nb <- naiveBayes (yeast.train$class ~ ., data=yeast.train, laplace=3)
+# predict the left-out data
+pred <- predict(yeast.nb,newdata=yeast.test)
+(tt <- table(Truth=yeast.test$class, Predicted=pred))
+(error <- 100*(1-sum(diag(tt))/sum(tt)))
+# Reduction of the error
+100*(baseline-error)/baseline
+# Real error for each class
+for (i in 1:8) {
+  cat(levels(yeast.test$class)[i])
+  print(1- tt[i,i]/sum(tt[i,]))
+}
+
+# Random Forest
+
+rf <- randomForest(formula = class ~., data = yeast.train, xtest = yeast.test[,-9],
+                   ytest = yeast.test[,9])
+print(rf)
 
 
 
