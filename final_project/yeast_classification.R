@@ -91,9 +91,9 @@ yeast$class <- factor(yeast$class)
 yeast <- yeast[,-which(colnames(yeast)=='erl')]
 # yeast <- yeast[,-which(colnames(yeast)=='vac')]
 str(yeast)
-resp.var <- which(colnames(yeast)=='class')
 # Also this time we are going to standarize the data 
 # Pre-processing 3.1 Standarize the data
+resp.var <- which(colnames(yeast)=='class')
 yeast[,1:(resp.var-1)] <- scale(yeast[,1:(resp.var-1)],center = TRUE)
 summary(yeast)
 summary(yeast$class)
@@ -108,7 +108,7 @@ yeast.test <- yeast[-learn,]
 dim(yeast.train)
 dim(yeast.test)
 
-# 5. Pre-processing: Feature extraction, PCA
+# 3.2 Pre-processing: Feature extraction, PCA
 
 par(mfrow = c(1,2))
 # find the index of the test individuals
