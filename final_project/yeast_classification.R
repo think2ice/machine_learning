@@ -48,13 +48,14 @@ barplot(table(yeast$class), main = colnames(yeast)[9])
 
 # 3. Preprocess the data
 
-# Notice that our target variable, class, is completely unbalanced
-# With CYT, NUC, MIT and ME3 the most frequent classes
-table(yeast[,ncol(yeast)])
 # Looking at the data density, perhaps a transformation could be applied to 
 # variables erl and pox
 summary(yeast[,6:7])
 # pox is always almost 0
+# Notice that our target variable, class, is completely unbalanced
+table(yeast[,which(colnames(yeast)=='class')])
+# With CYT, NUC, MIT and ME3 the most frequent classes
+# and ERL, POX and VAC with very few individuals
 
 # 4. Define training and test data
 
@@ -71,7 +72,6 @@ library(TunePareto)
 # several classifiers
 k <- 10
 CV.folds <- generateCVRuns(yeast.train$class, ntimes=1, nfold=k, stratified=TRUE)
-
 # 5. Classification methods
 
 # baseline: the error that we get predicting always the most probable class
@@ -84,48 +84,18 @@ CV.folds <- generateCVRuns(yeast.train$class, ntimes=1, nfold=k, stratified=TRUE
 # 5. PCA + Neural Networks
 # 6. Random Forest
 
-# With cross-validation
-# prepare the structure to store the partial results
-cv.results <- matrix (rep(0,4*k),nrow=k)
-colnames (cv.results) <- c("k","fold","TR error","VA error")
-
-cv.results[,"TR error"] <- 0
-cv.results[,"VA error"] <- 0
-cv.results[,"k"] <- k
-for (j in 1:k) {
-  # get VA data
-  va <- unlist(CV.folds[[1]][[j]])
-  tr <- yeast.train[-va,]
-  # train on TR data
-  yeast.nb <- naiveBayes(tr$class ~ . , data = tr, laplace=3)
-  
-  # predict TR data
-  pred.tr <- predict(yeast.nb,newdata=tr)
-  
-  tab <- table(tr$class, pred.tr)
-  cv.results[j,"TR error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
-  
-  # predict VA data
-  pred.va <- predict(yeast.nb,newdata=yeast.train[va,])
-  tab <- table(yeast.train[va,]$class, pred.va)
-  cv.results[j,"VA error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
-  cv.results[j,"fold"] <- j
-}
-cv.results
-# Average of the validation error
-
-(VA.error <- mean(cv.results[,"VA error"]))
 # necessary library for Naive Bayes
 library(e1071)
 # necessary library for Random Forest
 library(randomForest)
 # necessary library for LDA and QDA
 library(MASS)
+# needed so as to perform a PCA
+library(FactoMineR)
 # necessary library for Neural Networks
 library(nnet)
+# needed for use CV with Neural Networks
 
-k <- 10
-CV.folds <- generateCVRuns(yeast.train$class, ntimes=1, nfold=k, stratified=TRUE)
 Model.CV <- function (method)
 {
   cv.results <- matrix (rep(0,4*k),nrow=k)
@@ -173,7 +143,8 @@ Model.CV <- function (method)
       cv.results[j,"fold"] <- j
     }
     else if (method == "RandomForest"){
-      rf <- randomForest(formula = class ~., data = tr, xtest = yeast.train[va,-resp.var],
+      tr <- which(!is.na(match(row.names(yeast.train),row.names(tr))))
+      rf <- randomForest(formula = class ~., data = yeast.train, subset = tr, xtest = yeast.train[va,-resp.var],
                          ytest = yeast.train[va,resp.var])
       cv.results[j,"TR error"] <- 1 - sum(diag(rf$confusion[,-11]) / sum(rf$confusion[,-11]))
       cv.results[j,"VA error"] <- 1 - sum(diag(rf$test$confusion[,-11]) / sum(rf$test$confusion[,-11]))
@@ -197,30 +168,6 @@ Model.CV("QDA")
 Model.CV("KNN")
 # Test the behavior for Random Forest
 Model.CV("RandomForest")
-
-# Trying to solve our problem with PCA and Neural Networks
-# First we execute PCA to standarized and uncorrelated the data
-library("FactoMineR")
-par(mfrow = c(1,2))
-# find the index of the test individuals
-test <- which(!is.na(match(row.names(yeast),row.names(yeast.test))))
-# test <- as.vector(test)
-pca.yeast <- PCA(yeast, quali.sup = c(5,9), ind.sup = test)
-
-# Plot of the individuals (using class as a color) 
-par(mfrow = c(1,1))
-plot(pca_yeast$ind$coord, col = yeast$class)
-# Try to guess how many PC are the optimal for this problem
-# Plot of the eigenvalues
-plot(pca.yeast$eig$eigenvalue, type = "b", main = "Eigenvalues")
-pca.yeast$eig
-# Following the Kaiser rule (keeping at least 80% of the variance) we decided to 
-# keep 5 eigenvalues (which is the default number in PCA))
-# Now we can train a neural network
-pca.yeast.train <- pca.yeast$ind$coord
-summary(yeast)
-
-
 
 # 6. Results: Which classification algorithm is the best? 
 
@@ -279,6 +226,7 @@ for (i in 1:length(levels(yeast$class))) {
 # KNN
 
 
+
 # Neural Networks
 
 model.nnet <- nnet(class ~., data = yeast, subset=learn, size=20, maxit=200, decay=0.01)
@@ -291,7 +239,6 @@ t1 <- table(p1,yeast.train$class)
 p2 <- as.factor(predict (model.nnet, newdata=yeast.test, type="class"))
 t2 <- table(p2,yeast.test$class)
 (error_rate.test <- 100*(1-sum(diag(t2))/dim(yeast.test)[1]))
-library(caret)
 trc <- trainControl (method="repeatedcv", number=10, repeats=10)
 decays <- 10^seq(-3,0,by=0.2)
 model.10x10CV <- train (class ~., data = yeast, subset=learn, method='nnet', maxit = 200, trace = FALSE,
@@ -303,10 +250,66 @@ model.10x10CV$bestTune
 # Fit the best model with all the training and check the results: 
 model.nnet <- nnet(class ~., data = yeast, subset=learn, size=20, maxit=200, decay=0.01)
 
+# PCA +  Neural Networks
+
+# Trying to solve our problem with PCA and Neural Networks
+# First we execute PCA to standarized and uncorrelated the data
+library("FactoMineR")
+par(mfrow = c(1,2))
+# find the index of the test individuals
+test <- which(!is.na(match(row.names(yeast),row.names(yeast.test))))
+# test <- as.vector(test)
+pca.yeast <- PCA(yeast, quali.sup = c(5,9), ind.sup = test)
+# Plot of the individuals (using class as a color) 
+par(mfrow = c(1,1))
+plot(pca.yeast$ind$coord, col = yeast$class)
+# Try to guess how many PC are the optimal for this problem
+# Plot of the eigenvalues
+plot(pca.yeast$eig$eigenvalue, type = "b", main = "Eigenvalues")
+pca.yeast$eig
+# Following the Kaiser rule (keeping at least 80% of the variance) we decided to 
+# keep 5 eigenvalues (which is the default number in PCA))
+# Get the corresponding new coordinates + the response variable class
+pca.yeast.train <- pca.yeast$ind$coord
+pca.yeast.train <- as.data.frame(pca.yeast.train)
+pca.yeast.train[row.names(yeast.train),'class'] <- yeast.train[,which(colnames(yeast.train) == 'class')]
+pca.yeast.test <- pca.yeast$ind.sup$coord
+pca.yeast.test <- as.data.frame(pca.yeast.test)
+pca.yeast.test[row.names(yeast.test),'class'] <- yeast.test[,which(colnames(yeast.test) == 'class')]
+pca.yeast.data <- rbind(pca.yeast.train,pca.yeast.test)
+# Now we can train a neural network
+model.nnet <- nnet(class ~., data = pca.yeast.data, subset=1:dim(pca.yeast.train)[1], size=30, maxit=200, decay=0.0001)
+summary(model.nnet)
+# TR error
+p1 <- as.factor(predict (model.nnet, type="class"))
+t1 <- table(p1,pca.yeast.train$class)
+(error_rate.learn <- 100*(1-sum(diag(t1))/dim(yeast.train)[1]))
+# TEST error
+p2 <- as.factor(predict (model.nnet, newdata=pca.yeast.test, type="class"))
+t2 <- table(p2,pca.yeast.test$class)
+(error_rate.test <- 100*(1-sum(diag(t2))/dim(yeast.test)[1]))
+trc <- trainControl (method="repeatedcv", number=10, repeats=10)
+decays <- 10^seq(-3,0,by=0.1)
+model.10x10CV <- train (class ~., data = pca.yeast.data, subset=1:dim(pca.yeast.train)[1], method='nnet', maxit = 200, trace = FALSE,
+                        tuneGrid = expand.grid(.size=10,.decay=decays), trControl=trc)
+## We can inspect the full results
+model.10x10CV$results
+## and the best model found
+model.10x10CV$bestTune
+# Fit the best model with all the training and check the results: 
+model.nnet <- nnet(class ~., data = pca.yeast.data, subset=1:dim(pca.yeast.train)[1], size=10, maxit=200, decay=0.398)
+# TR error
+p1 <- as.factor(predict (model.nnet, type="class"))
+t1 <- table(p1,pca.yeast.train$class)
+(error_rate.learn <- 100*(1-sum(diag(t1))/dim(pca.yeast.train)[1]))
+# TEST error
+p2 <- as.factor(predict (model.nnet, newdata=pca.yeast.test, type="class"))
+t2 <- table(p2,pca.yeast.test$class)
+(error_rate.test <- 100*(1-sum(diag(t2))/dim(pca.yeast.test)[1]))
 
 # Random Forest
 
-rf <- randomForest(formula = class ~., data = yeast.train, xtest = yeast.test[,-9],
+rf <- randomForest(formula = class ~., data = yeast, subset = learn, xtest = yeast.test[,-9],
                    ytest = yeast.test[,9])
 print(rf)
 
