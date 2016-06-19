@@ -73,6 +73,8 @@ summary(yeast[,6:7])
 # Notice that our target variable, class, is completely unbalanced
 table(yeast[,which(colnames(yeast)=='class')])
 table(yeast$vac, yeast$class)
+
+# 3.3 Pre-processing Feature Selection
 # With CYT, NUC, MIT and ME3 the most frequent classes
 # and ERL, POX and VAC with very few individuals
 # there are too few ERL, so we decide to not take into account this class
@@ -91,6 +93,7 @@ yeast <- yeast[,-which(colnames(yeast)=='erl')]
 str(yeast)
 resp.var <- which(colnames(yeast)=='class')
 # Also this time we are going to standarize the data 
+# Pre-processing 3.1 Standarize the data
 yeast[,1:(resp.var-1)] <- scale(yeast[,1:(resp.var-1)],center = TRUE)
 summary(yeast)
 summary(yeast$class)
@@ -105,7 +108,7 @@ yeast.test <- yeast[-learn,]
 dim(yeast.train)
 dim(yeast.test)
 
-# 5. Feature extraction: PCA
+# 5. Pre-processing: Feature extraction, PCA
 
 par(mfrow = c(1,2))
 # find the index of the test individuals
