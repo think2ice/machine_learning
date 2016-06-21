@@ -74,6 +74,7 @@ summary(yeast[,6:7])
 table(yeast[,which(colnames(yeast)=='class')])
 table(yeast$vac, yeast$class)
 
+#######################################################################################################
 # 3.3 Pre-processing Feature Selection
 # With CYT, NUC, MIT and ME3 the most frequent classes
 # and ERL, POX and VAC with very few individuals
@@ -91,6 +92,10 @@ yeast$class <- factor(yeast$class)
 yeast <- yeast[,-which(colnames(yeast)=='erl')]
 # yeast <- yeast[,-which(colnames(yeast)=='vac')]
 str(yeast)
+
+#######################################################################################################
+
+
 # Also this time we are going to standarize the data 
 # Pre-processing 3.1 Standarize the data
 resp.var <- which(colnames(yeast)=='class')
@@ -108,6 +113,8 @@ yeast.test <- yeast[-learn,]
 dim(yeast.train)
 dim(yeast.test)
 
+
+#######################################################################################################
 # 3.2 Pre-processing: Feature extraction, PCA
 
 par(mfrow = c(1,2))
@@ -133,12 +140,16 @@ pca.yeast.test <- as.data.frame(pca.yeast.test)
 pca.yeast.test[row.names(yeast.test),'class'] <- yeast.test[,which(colnames(yeast.test) == 'class')]
 pca.yeast.data <- rbind(pca.yeast.train,pca.yeast.test)
 
-# 5. Classification methods
+
 
 # Both test: without PCA and with PCA (uncomment this lines so as to use PCA)
 yeast.train <- pca.yeast.train[row.names(yeast.train),]
 yeast.test <- pca.yeast.test[row.names(yeast.test),]
 yeast <- pca.yeast.data[row.names(yeast),]
+
+#######################################################################################################
+
+# 5. Classification methods
 
 # Prepare a crossvalidation 10x10 method to get the best model with
 # several classifiers
@@ -217,7 +228,7 @@ Model.CV <- function (method)
       cv.results[j,"fold"] <- j
     }
     else if (method == 'NeuralNetworks'){
-      model.nnet <- nnet(class ~., data = tr, size=20, maxit=400, decay=0.0793)
+      model.nnet <- nnet(class ~., data = tr, size=20, maxit=200, decay=0.001)
       # TR error
       p1 <- as.factor(predict (model.nnet, type="class"))
       t1 <- table(p1,tr$class)
@@ -371,7 +382,7 @@ model.10x10CV$results
 model.10x10CV$bestTune
 # Fit the best model with all the training and check the behavior of the
 # algorithm once it is trained with all the training data and predicts all the test data
-model.nnet <- nnet(class ~., data = yeast, subset=learn, size=20, maxit=400, decay=0.07943282)
+model.nnet <- nnet(class ~., data = yeast, subset=learn, size=20, maxit=200, decay=0.001)
 # TR error
 p1 <- as.factor(predict (model.nnet, type="class"))
 t1 <- table(p1,yeast.train$class)
